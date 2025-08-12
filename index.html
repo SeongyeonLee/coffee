@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나의 커피 기록장 5.0 — 기록 중심 뷰 & 모달 입력</title>
+<style>
+:root{
+  --bg:#0e1117; --panel:#141926; --ink:#e9eef6; --muted:#a5b1c2; --line:#242b3a;
+  --accent:#73e7ff; --accent2:#a7a6ff; --ok:#82f7a0; --warn:#ffd073; --danger:#ff7b7b;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0; background:linear-gradient(180deg,#0e1117,#0b0e15 70%); color:var(--ink); font-family: ui-sans-serif, -apple-system, "Apple SD Gothic Neo","Noto Sans KR",Segoe UI, Roboto, Helvetica, Arial}
+.app{display:flex; height:100%}
+.sidebar{width:320px; min-width:280px; border-right:1px solid var(--line); display:flex; flex-direction:column; background:linear-gradient(180deg,#121625,#0f1420)}
+.brand{display:flex; align-items:center; gap:10px; padding:16px; border-bottom:1px solid var(--line)}
+.logo{width:28px;height:28px;border-radius:8px;background:
+  radial-gradient(circle at 30% 30%,var(--accent),transparent 60%),
+  linear-gradient(135deg,var(--accent2),transparent 60%);
+  box-shadow:0 0 0 1px #2b3244 inset, 0 8px 22px rgba(0,0,0,.35);
+}
+.brand h1{font-size:15px; margin:0}
+.sec{padding:10px 12px}
+.search input{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0f1420; color:var(--ink); outline:none}
+.list{flex:1; overflow:auto; padding:8px 10px 100px}
+.item{padding:12px;border:1px solid var(--line);background:#0f1420;border-radius:12px;margin:8px 4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:.12s}
+.item:hover{transform:translateY(-1px);border-color:#2b3348}
+.item.active{border-color:var(--accent); box-shadow:0 0 0 1px rgba(115,231,255,.25) inset}
+.item .name{font-weight:700}
+.item .meta{font-size:12px;color:var(--muted)}
+.actions{position:sticky; bottom:0; padding:10px; border-top:1px solid var(--line); background:linear-gradient(180deg,#0f1420,#0c1018)}
+.btn{background:#141b2a; color:var(--ink); border:1px solid var(--line); padding:9px 12px; border-radius:10px; cursor:pointer; font-size:13px}
+.btn + .btn{margin-left:6px}
+.btn.accent{background:linear-gradient(180deg,#132235,#0f1726);border-color:#2a3a54; color:#dff7ff}
+.btn.small{font-size:12px; padding:6px 8px; border-radius:8px}
+.btn.warn{background:#2a2314; border-color:#3f3420; color:#ffeec3}
+.btn.danger{background:#2a1418; border-color:#3d2026; color:#ffd7dc}
+.main{flex:1; display:flex; flex-direction:column; min-width:0}
+.top{display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--line)}
+.pill{display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; background:#0f1520}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.crumb{font-size:13px;color:var(--muted)}
+.crumb b{color:var(--ink)}
+.entries{padding:14px; overflow:auto}
+.entry{border:1px solid var(--line); background:linear-gradient(180deg,#121827,#0e1422); border-radius:14px; margin:10px 0; padding:12px}
+.entry .row{display:grid; grid-template-columns:repeat(6,1fr); gap:8px}
+.entry .row + .row{margin-top:8px}
+.entry .row > div{min-width:0}
+.meta{color:var(--muted); font-size:12px}
+.cost{color:#d8f9ff; font-weight:700}
+.empty{color:var(--muted); text-align:center; padding:20px}
+.tag{font-size:11px; color:#cfe7ff; border:1px solid #223448; padding:2px 6px; border-radius:10px}
+.statpill{display:inline-block; padding:3px 8px; border:1px solid #28405a; border-radius:999px; font-size:12px; color:#d7efff}
+.badge{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; border:1px solid #24344a; background:#0f1824; font-size:12px; color:#cde8ff}
+.badge .d{font-weight:700; color:#bfe7ff}
+.filterbar{display:flex; align-items:center; gap:8px; padding:8px 16px; flex-wrap:wrap; border-bottom:1px solid var(--line)}
+.right{text-align:right}
+.tools{display:flex; gap:6px; flex-wrap:wrap}
+.fab{position:fixed; right:16px; bottom:16px; display:flex; gap:8px}
+.fab .btn{box-shadow:0 8px 20px rgba(0,0,0,.3)}
+/* Modal */
+.modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center}
+.modal .box{background:#0f1420; border:1px solid var(--line); border-radius:16px 16px 0 0; width:100%; max-width:980px; max-height:85vh; overflow:auto; padding:16px}
+.modal h3{margin:0 0 10px 0; font-size:15px}
+.grid{display:grid; gap:12px; grid-template-columns:1fr 1fr}
+label{font-size:12px; color:var(--muted); display:block; margin-bottom:6px}
+input[type="text"], input[type="number"], input[type="date"], textarea, select{
+  width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:#0e1422; color:var(--ink); outline:none
+}
+textarea{min-height:76px; resize:vertical}
+.footer{display:flex; justify-content:flex-end; gap:8px; margin-top:8px}
+@media (max-width:1000px){
+  .grid{grid-template-columns:1fr}
+  .entry .row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo"></div>
+      <h1>나의 커피 기록장 5.0</h1>
+    </div>
+    <div class="sec search">
+      <input id="q" type="text" placeholder="이름 또는 품종으로 검색 (예: Geisha, SL28)">
+    </div>
+    <div id="list" class="list"></div>
+    <div class="actions">
+      <button class="btn accent" id="addCoffee">+ 커피 추가</button>
+      <button class="btn small" id="rename">이름 수정</button>
+      <button class="btn small" id="basicsBtn">기본정보</button>
+      <button class="btn small danger" id="remove">삭제</button><br>
+      <button class="btn small" id="exportBtn">내보내기</button>
+      <button class="btn small" id="importBtn">가져오기</button>
+      <input id="importFile" type="file" accept=".json" style="display:none">
+      <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+        <button class="btn small" id="connectSync">동기화 파일 연결</button>
+        <button class="btn small" id="saveToSync">동기화 저장</button>
+        <button class="btn small" id="loadFromSync">동기화 불러오기</button>
+      </div>
+      <div class="meta" style="margin-top:6px">
+        iCloud/Drive의 <b>coffee_data.json</b>과 연결하면 기기 간 동일 데이터 사용.
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb">선택: <b id="crumb">없음</b></div>
+      <div class="pill"><span class="dot"></span> <span id="cnt">0</span> 건 기록</div>
+      <div class="tools">
+        <button class="btn small" id="farmSearch">농장 정보 검색</button>
+        <button class="btn small" id="smartPaste">스마트 붙여넣기</button>
+        <button class="btn small" id="statsBtn">통계</button>
+      </div>
+    </div>
+
+    <div class="filterbar">
+      <span class="meta">방법 필터:</span>
+      <select id="methodFilter"><option value="">전체</option></select>
+    </div>
+
+    <section id="entries" class="entries">
+      <div class="empty" id="emptyMsg">왼쪽에서 커피를 선택하거나 새로 추가해 주세요.</div>
+      <div id="entryList"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Entry Modal -->
+<div id="entryModal" class="modal">
+  <div class="box">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <h3>기록 추가/수정</h3>
+      <button class="btn small" id="closeEntry">닫기</button>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div><label>날짜 (추출일)</label><input id="date" type="date"></div>
+      <div><label>추출 방식</label>
+        <input id="method" list="methodList" type="text" placeholder="예: V60, Origami Cone, Wave, Kalita, Immersion">
+        <datalist id="methodList">
+          <option value="V60"><option value="Origami Cone"><option value="Origami Wave">
+          <option value="Kalita"><option value="Immersion"><option value="Aeropress">
+        </datalist>
+      </div>
+      <div><label>패키지 단위</label><select id="unit"><option value="100">100 g</option><option value="200">200 g</option></select></div>
+      <div><label>패키지 가격 (원)</label><input id="price" type="number" min="0" placeholder="예: 19000"></div>
+      <div><label>1회 사용 원두량 (g)</label><input id="dose" type="number" min="1" value="16"></div>
+      <div><label>추출 물량 (ml)</label><input id="water" type="number" min="1" value="250"></div>
+      <div><label>물 온도 (℃)</label><input id="temp" type="number" min="70" max="100" value="93"></div>
+      <div style="grid-column:1/-1"><label>드립 레시피</label><textarea id="recipe" placeholder="예: 0:00 40g bloom, 0:30~1:00 100g, 1:10~1:45 110g, 총 2:25"></textarea></div>
+      <div><label>컵 노트</label><textarea id="notes" placeholder="예: jasmine, black tea, white peach, citrus"></textarea></div>
+      <div><label>한줄평</label><input id="one" type="text" placeholder="예: 산뜻한 산미, 깨끗한 여운"></div>
+    </div>
+    <div class="footer" style="justify-content:space-between">
+      <div class="meta">예상 1회 비용: <span id="cost" class="cost">-</span></div>
+      <div>
+        <button class="btn small" id="calc">비용 계산</button>
+        <button class="btn" id="add">기록 저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Basics Modal -->
+<div id="basicsModal" class="modal">
+  <div class="box">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <h3>커피 기본 정보</h3>
+      <button class="btn small" id="closeBasics">닫기</button>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div><label>커피 이름</label><input id="name" type="text" placeholder="예: Bolivia Finca Isabel Geisha"></div>
+      <div><label>원산지/농장 정보</label><input id="farm" type="text" placeholder="예: Caranavi, Bolivia · Finca Isabel"></div>
+      <div><label>로스터</label><input id="roaster" type="text" placeholder="예: Stronghold, April 등"></div>
+      <div><label>구매처 / 메모</label><input id="purchase" type="text" placeholder="예: 공식몰, 오프라인 샵 등"></div>
+      <div><label>품종 (Variety)</label><input id="variety" type="text" placeholder="예: Geisha, SL28, Bourbon"></div>
+      <div><label>가공 방식 (Process)</label><input id="process" type="text" placeholder="예: Washed, Natural, Honey"></div>
+      <div><label>로스팅 일자</label><input id="roastDate" type="date"></div>
+      <div><label>로스팅 경과</label><div id="roastAge" class="badge"><span class="d">D+?</span><span>로스팅일 입력 필요</span></div></div>
+    </div>
+    <div class="footer">
+      <button class="btn" id="saveBasics">저장</button>
+    </div>
+    <div class="meta">※ 농장 정보 검색 & 스마트 붙여넣기로 자동 채움 가능.</div>
+  </div>
+</div>
+
+<!-- Stats Modal -->
+<div id="statsModal" class="modal">
+  <div class="box">
+    <div style="display:flex; justify-content:space-between; align-items:center">
+      <h3>통계 — 품종/방법</h3>
+      <button class="btn small" id="closeStats">닫기</button>
+    </div>
+    <div style="display:grid; gap:16px; grid-template-columns:1fr 1fr; margin-top:8px">
+      <div>
+        <h4 style="margin:6px 0">품종별</h4>
+        <table id="varietyTable">
+          <thead><tr><th>품종</th><th>커피 수</th><th>기록 수</th><th>평균 D+ (추출일)</th><th>평균 도징(g)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h4 style="margin:6px 0">추출 방식별</h4>
+        <table id="methodTable">
+          <thead><tr><th>방법</th><th>기록 수</th><th>평균 온도(℃)</th><th>평균 물량(ml)</th><th>평균 도징(g)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="fab">
+  <button class="btn accent" id="newEntryFab">+ 기록</button>
+  <button class="btn" id="statsFab">통계</button>
+</div>
+
+<script>
+(()=>{
+  const $ = s=>document.querySelector(s);
+  const $$ = s=>Array.from(document.querySelectorAll(s));
+  const uid = ()=> Math.random().toString(36).slice(2,9);
+  const store = {
+    key:'coffee-journal-v5',
+    get(){ try{ return JSON.parse(localStorage.getItem(this.key)) || {coffees:[], selectedId:null}; }catch(e){ return {coffees:[], selectedId:null}; } },
+    set(d){ localStorage.setItem(this.key, JSON.stringify(d)); }
+  };
+  let syncHandle = null;
+
+  function money(n){ if(!n && n!==0) return '-'; if(isNaN(n)) return '-'; return new Intl.NumberFormat('ko-KR',{style:'currency',currency:'KRW',maximumFractionDigits:0}).format(n); }
+  function daysBetween(aStr, bStr){ if(!aStr || !bStr) return null; const a=new Date(aStr+'T00:00:00'); const b=new Date(bStr+'T00:00:00'); if(isNaN(a)||isNaN(b)) return null; return Math.floor((b-a)/(1000*60*60*24)); }
+
+  function renderList(filter=''){
+    const s = store.get();
+    const list = $('#list'); list.innerHTML='';
+    const f = (filter||'').toLowerCase();
+    const arr = s.coffees
+      .slice()
+      .sort((a,b)=> (b.createdAt||0)-(a.createdAt||0)) // 최신 커피 위로
+      .filter(c=> (c.name||'').toLowerCase().includes(f) || (c.variety||'').toLowerCase().includes(f));
+    if(arr.length===0){ list.innerHTML='<div class="empty">커피가 없습니다. [+ 커피 추가]로 시작하세요.</div>'; return; }
+    arr.forEach(c=>{
+      const div = document.createElement('div');
+      const count = c.entries?.length || 0;
+      const used = (c.entries||[]).reduce((a,e)=>a+(e.dose||0),0);
+      div.className='item'+(c.id===s.selectedId?' active':'');
+      const v = c.variety ? ' · '+c.variety : '';
+      div.innerHTML = `<div><div class="name">${c.name||'이름 없음'}</div><div class="meta">${c.farmInfo||''}${v}</div></div><div class="meta">${count}회 · 총 ${used}g</div>`;
+      div.onclick = ()=>{ s.selectedId=c.id; store.set(s); select(); };
+      list.appendChild(div);
+    });
+  }
+
+  function select(){
+    const s = store.get();
+    const c = s.coffees.find(x=>x.id===s.selectedId);
+    $('#crumb').textContent = c? c.name : '없음';
+    $('#cnt').textContent = c?.entries?.length || 0;
+    renderList($('#q').value||'');
+    renderEntries();
+  }
+
+  function renderEntries(){
+    const s = store.get();
+    const c = s.coffees.find(x=>x.id===s.selectedId);
+    const list = $('#entryList'); list.innerHTML='';
+    if(!c){ $('#emptyMsg').style.display='block'; return; } else { $('#emptyMsg').style.display='none'; }
+    // build method filter
+    const methods = Array.from(new Set((c.entries||[]).map(e=>e.method).filter(Boolean)));
+    const mf = $('#methodFilter'); const prev = mf.value;
+    mf.innerHTML = '<option value="">전체</option>' + methods.map(m=>`<option value="${m}">${m}</option>`).join('');
+    if(methods.includes(prev)) mf.value = prev;
+    const methodFilter = mf.value || '';
+
+    const rows = (c.entries||[]).slice().sort((a,b)=> (b.date||'').localeCompare(a.date||'')); // 최신 기록 위
+    const filtered = rows.filter(e=> !methodFilter || (e.method||'')===methodFilter);
+    filtered.forEach(e=>{
+      const dPlus = daysBetween(c.roastDate, e.date);
+      const dBadge = dPlus==null ? '' : `<span class="badge">로스팅 후 <span class="d">D+${dPlus}</span> (추출일)</span>`;
+      const div = document.createElement('div');
+      div.className='entry';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px; flex-wrap:wrap">
+          <div><span class="tag">${e.date||'날짜 없음'}</span> <b style="margin-left:6px">${c.name}</b> ${c.variety? `<span class="statpill">${c.variety}</span>`:''} ${e.method? `<span class="statpill">${e.method}</span>`:''}</div>
+          <div class="right" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            ${dBadge}
+            <span class="meta">1회 비용 <span class="cost">${money(e.costPerBrew||0)}</span></span>
+            <button class="btn small" data-edit="${e.id}">수정</button>
+            <button class="btn small danger" data-del="${e.id}">삭제</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div><label class="meta">품종</label><div>${c.variety||'-'}</div></div>
+          <div><label class="meta">가공</label><div>${c.process||'-'}</div></div>
+          <div><label class="meta">추출 방식</label><div>${e.method||'-'}</div></div>
+          <div><label class="meta">패키지 단위</label><div>${e.unit||'-'} g</div></div>
+          <div><label class="meta">패키지 가격</label><div>${money(e.price||0)}</div></div>
+          <div><label class="meta">도징</label><div>${e.dose||''} g</div></div>
+        </div>
+        <div class="row">
+          <div><label class="meta">물 온도</label><div>${e.temp||''} ℃</div></div>
+          <div><label class="meta">추출 수량</label><div>${e.water||''} ml</div></div>
+          <div style="grid-column:3/7"><label class="meta">로스팅 일자</label><div>${c.roastDate||'-'}</div></div>
+        </div>
+        <div class="row">
+          <div style="grid-column:1/-1"><label class="meta">드립 레시피</label><div class="meta">${(e.recipe||'').replace(/\n/g,'<br>')}</div></div>
+        </div>
+        <div class="row">
+          <div><label class="meta">컵 노트</label><div>${(e.notes||'-').replace(/\n/g,'<br>')}</div></div>
+          <div style="grid-column:2/7"><label class="meta">한줄평</label><div>${e.oneLiner||'-'}</div></div>
+        </div>
+      `;
+      list.appendChild(div);
+      div.querySelector('[data-del]').onclick = ()=>{
+        if(!confirm('이 기록을 삭제할까요?')) return;
+        c.entries = c.entries.filter(x=>x.id!==e.id);
+        store.set(s); renderEntries(); updateCounts();
+      };
+      div.querySelector('[data-edit]').onclick = ()=> openEntryModal(e);
+    });
+    if(filtered.length===0){ list.innerHTML = '<div class="empty">조건에 맞는 기록이 없습니다.</div>'; }
+  }
+
+  function updateCounts(){
+    const s = store.get();
+    const c = s.coffees.find(x=>x.id===s.selectedId);
+    $('#cnt').textContent = c?.entries?.length || 0;
+    renderList($('#q').value||'');
+  }
+
+  // ---------- Modals ----------
+  function openEntryModal(entry=null){
+    $('#entryModal').style.display='flex';
+    if(entry){
+      $('#date').value = entry.date||new Date().toISOString().slice(0,10);
+      $('#method').value = entry.method||'';
+      $('#unit').value = String(entry.unit||100);
+      $('#price').value = entry.price||'';
+      $('#dose').value = entry.dose||'';
+      $('#water').value = entry.water||'';
+      $('#temp').value = entry.temp||'';
+      $('#recipe').value = entry.recipe||'';
+      $('#notes').value = entry.notes||'';
+      $('#one').value = entry.oneLiner||'';
+      $('#add').dataset.edit = entry.id;
+      $('#add').textContent = '기록 업데이트';
+    }else{
+      $('#date').value = new Date().toISOString().slice(0,10);
+      $('#method').value=''; $('#unit').value='100'; $('#price').value=''; $('#dose').value='16';
+      $('#water').value='250'; $('#temp').value='93'; $('#recipe').value=''; $('#notes').value=''; $('#one').value='';
+      delete $('#add').dataset.edit; $('#add').textContent='기록 저장';
+    }
+    calcCost();
+  }
+  function closeEntryModal(){ $('#entryModal').style.display='none'; }
+
+  function openBasicsModal(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    if(!c) return alert('왼쪽에서 커피를 선택하세요.');
+    $('#name').value = c.name||'';
+    $('#farm').value = c.farmInfo||'';
+    $('#roaster').value = c.roaster||'';
+    $('#purchase').value = c.purchase||'';
+    $('#variety').value = c.variety||'';
+    $('#process').value = c.process||'';
+    $('#roastDate').value = c.roastDate||'';
+    renderRoastAge(c);
+    $('#basicsModal').style.display='flex';
+  }
+  function renderRoastAge(c){
+    const d = c?.roastDate; if(!d){ $('#roastAge').innerHTML='<span class="d">D+?</span><span>로스팅일 입력 필요</span>'; return; }
+    $('#roastAge').innerHTML = `<span class="d">D+0</span><span>추출일 기준 배지는 기록 카드에 표시</span>`;
+  }
+  function closeBasicsModal(){ $('#basicsModal').style.display='none'; }
+
+  // ---------- CRUD ----------
+  function saveBasics(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    if(!c) return;
+    c.name = $('#name').value.trim() || '이름 없음';
+    c.farmInfo = $('#farm').value.trim();
+    c.roaster = $('#roaster').value.trim();
+    c.purchase = $('#purchase').value.trim();
+    c.variety = $('#variety').value.trim();
+    c.process = $('#process').value.trim();
+    c.roastDate = $('#roastDate').value;
+    store.set(s); renderList($('#q').value||''); select(); closeBasicsModal();
+  }
+
+  function addCoffee(){
+    const s = store.get();
+    const c = { id: uid(), createdAt: Date.now(), name:'새 커피', farmInfo:'', roaster:'', purchase:'', variety:'', process:'', roastDate:'', entries:[] };
+    s.coffees.push(c); s.selectedId = c.id; store.set(s); renderList(); select();
+    openBasicsModal();
+  }
+  function removeCoffee(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    if(!c) return; if(!confirm(`'${c.name}'을(를) 삭제할까요? 모든 기록이 지워집니다.`)) return;
+    s.coffees = s.coffees.filter(x=>x.id!==c.id); s.selectedId = s.coffees[0]?.id || null; store.set(s); renderList($('#q').value||''); select();
+  }
+  function renameCoffee(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    if(!c) return alert('선택된 커피가 없습니다.');
+    const nv = prompt('커피 이름을 입력하세요', c.name||''); if(nv===null) return;
+    c.name = (nv||'').trim() || c.name; store.set(s); renderList($('#q').value||''); select();
+  }
+
+  function calcCost(){
+    const unit = parseInt($('#unit').value||'100',10);
+    const price = Number($('#price').value||0);
+    const dose = Number($('#dose').value||0);
+    const cost = (unit>0)? (price/unit)*dose : 0;
+    $('#cost').textContent = (price && dose) ? money(cost) : '-';
+  }
+
+  function saveEntry(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    if(!c) return alert('왼쪽에서 커피를 선택하세요.');
+    const e = {
+      id: $('#add').dataset.edit || uid(),
+      date: $('#date').value || new Date().toISOString().slice(0,10),
+      method: $('#method').value || '',
+      unit: parseInt($('#unit').value||'100',10),
+      price: Number($('#price').value||0),
+      dose: Number($('#dose').value||0),
+      water: Number($('#water').value||0),
+      temp: Number($('#temp').value||0),
+      recipe: $('#recipe').value||'',
+      notes: $('#notes').value||'',
+      oneLiner: $('#one').value||'',
+    };
+    e.costPerBrew = e.price && e.unit ? Math.round((e.price/e.unit)*e.dose) : 0;
+    c.entries = c.entries || [];
+    const idx = c.entries.findIndex(x=>x.id===e.id);
+    if(idx>=0) c.entries[idx]=e; else c.entries.push(e);
+    // Keep newest-first rendering; no need to sort storage, just render sort
+    store.set(s); closeEntryModal(); renderEntries(); updateCounts();
+  }
+
+  // ---------- Export/Import ----------
+  function exportData(){
+    const data = JSON.stringify(store.get(), null, 2);
+    const url = URL.createObjectURL(new Blob([data],{type:'application/json'}));
+    const a = document.createElement('a'); a.href=url; a.download='coffee_journal_backup.json'; a.click(); URL.revokeObjectURL(url);
+  }
+  function importData(file){
+    const r = new FileReader();
+    r.onload = ()=>{ try{
+      const json = JSON.parse(r.result);
+      if(!json || !Array.isArray(json.coffees)) throw new Error('형식 오류');
+      // Add createdAt if missing (backward compat)
+      json.coffees.forEach(c=>{ if(!('createdAt' in c)) c.createdAt = Date.now(); });
+      localStorage.setItem(store.key, JSON.stringify(json));
+      renderList(); select(); alert('가져오기 완료');
+    }catch(e){ alert('가져오기 실패: '+e.message); } };
+    r.readAsText(file);
+  }
+
+  // ---------- Sync File ----------
+  async function pickSyncFile(){
+    try{
+      const [handle] = await window.showOpenFilePicker({ multiple:false, types:[{ description:'JSON', accept:{'application/json':['.json']} }] });
+      syncHandle = handle; alert('동기화 파일 연결 완료: ' + handle.name);
+    }catch(e){}
+  }
+  async function saveToSync(){
+    try{
+      if(!syncHandle){
+        syncHandle = await window.showSaveFilePicker({ suggestedName:'coffee_data.json', types:[{ description:'JSON', accept:{'application/json':['.json']} }] });
+      }
+      const writable = await syncHandle.createWritable();
+      const data = JSON.stringify(store.get(), null, 2);
+      await writable.write(data); await writable.close(); alert('동기화 파일에 저장 완료');
+    }catch(e){ alert('저장 실패: 이 브라우저는 파일 접근을 지원하지 않거나 권한이 거부되었습니다.'); }
+  }
+  async function loadFromSync(){
+    try{
+      if(!syncHandle){ await pickSyncFile(); if(!syncHandle) return; }
+      const file = await syncHandle.getFile(); const text = await file.text(); const json = JSON.parse(text);
+      if(!json || !Array.isArray(json.coffees)) throw new Error('형식 오류');
+      json.coffees.forEach(c=>{ if(!('createdAt' in c)) c.createdAt = Date.now(); });
+      localStorage.setItem(store.key, JSON.stringify(json)); renderList(); select(); alert('동기화 파일에서 불러오기 완료');
+    }catch(e){ alert('불러오기 실패: '+e.message); }
+  }
+
+  // ---------- Smart helpers ----------
+  function farmSearch(){
+    const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId);
+    const q = encodeURIComponent(c?.name || '');
+    ['https://typica.coffee/en/search/?q='+q,
+     'https://allianceforcoffeeexcellence.org/?s='+q,
+     'https://www.google.com/search?q='+q+' origin farm variety process altitude producer'
+    ].forEach(u=>window.open(u,'_blank'));
+  }
+  async function smartPaste(){
+    try{
+      const text = await navigator.clipboard.readText(); if(!text){ alert('클립보드에 텍스트가 없습니다.'); return; }
+      const t = text.replace(/\n/g,'; ');
+      const get = (keys)=>{ for(const k of keys){ const m = t.match(new RegExp(k+'\\s*[:：]\\s*([^;]+)','i')); if(m) return m[1].trim(); } return ''; };
+      const country=get(['Country','국가']), region=get(['Region','지역']), farm=get(['Farm','Estate','농장']), variety=get(['Variety','Varietal','품종']), process=get(['Process','Processing','가공']), altitude=get(['Altitude','MASL','해발']), producer=get(['Producer','Owner','생산자']);
+      const joined=[country,region].filter(Boolean).join(', '); const farmLine=[joined,farm].filter(Boolean).join(' · '); const trailing=[variety,process,altitude,producer].filter(Boolean).join(' | ');
+      const s = store.get(); const c = s.coffees.find(x=>x.id===s.selectedId); if(!c) return alert('왼쪽에서 커피를 선택하세요.');
+      if(farmLine) c.farmInfo = trailing ? (farmLine+' — '+trailing) : farmLine;
+      if(variety) c.variety = variety; if(process) c.process = process;
+      store.set(s); renderList($('#q').value||''); renderEntries(); alert('클립보드 텍스트에서 농장 정보를 채웠습니다.');
+    }catch(e){ alert('클립보드 접근 실패: 브라우저 권한을 확인하세요.'); }
+  }
+
+  // ---------- Stats ----------
+  function openStats(){
+    const s = store.get();
+    const byVariety = new Map(); const byMethod = new Map();
+    for(const c of s.coffees){
+      for(const e of (c.entries||[])){
+        const v = (c.variety||'미지정');
+        if(!byVariety.has(v)) byVariety.set(v,{variety:v, coffees:new Set(), entries:0, dps:[], doses:[]});
+        const vs = byVariety.get(v); vs.coffees.add(c.id); vs.entries += 1;
+        const dplus = c.roastDate && e.date ? daysBetween(c.roastDate, e.date) : null; if(dplus!=null) vs.dps.push(dplus);
+        if(e.dose) vs.doses.push(e.dose);
+        const m = (e.method||'미지정');
+        if(!byMethod.has(m)) byMethod.set(m,{method:m, entries:0, temps:[], waters:[], doses:[]});
+        const ms = byMethod.get(m); ms.entries += 1; if(e.temp) ms.temps.push(e.temp); if(e.water) ms.waters.push(e.water); if(e.dose) ms.doses.push(e.dose);
+      }
+    }
+    const vBody = $('#varietyTable tbody'); vBody.innerHTML='';
+    for(const v of byVariety.values()){
+      const avg = arr=> arr.length? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : '-';
+      const tr = document.createElement('tr'); tr.innerHTML = `<td>${v.variety}</td><td>${v.coffees.size}</td><td>${v.entries}</td><td>${avg(v.dps)}</td><td>${avg(v.doses)}</td>`; vBody.appendChild(tr);
+    }
+    const mBody = $('#methodTable tbody'); mBody.innerHTML='';
+    for(const m of byMethod.values()){
+      const avg = arr=> arr.length? Math.round(arr.reduce((a,b)=>a+b,0)/arr.length) : '-';
+      const tr = document.createElement('tr'); tr.innerHTML = `<td>${m.method}</td><td>${m.entries}</td><td>${avg(m.temps)}</td><td>${avg(m.waters)}</td><td>${avg(m.doses)}</td>`; mBody.appendChild(tr);
+    }
+    $('#statsModal').style.display='flex';
+  }
+  function closeStats(){ $('#statsModal').style.display='none'; }
+
+  // Events
+  $('#q').oninput = e=> renderList(e.target.value||'');
+  $('#addCoffee').onclick = addCoffee;
+  $('#remove').onclick = removeCoffee;
+  $('#rename').onclick = renameCoffee;
+  $('#farmSearch').onclick = farmSearch;
+  $('#smartPaste').onclick = smartPaste;
+  $('#statsBtn').onclick = openStats; $('#statsFab').onclick = openStats; $('#closeStats').onclick = closeStats;
+  $('#methodFilter').onchange = renderEntries;
+  // Modals
+  $('#newEntryFab').onclick = ()=> openEntryModal();
+  $('#closeEntry').onclick = closeEntryModal;
+  $('#basicsBtn').onclick = openBasicsModal;
+  $('#closeBasics').onclick = closeBasicsModal;
+  // Entry actions
+  $('#calc').onclick = ()=>{
+    const unit=parseInt($('#unit').value||'100',10), price=Number($('#price').value||0), dose=Number($('#dose').value||0);
+    const cost=(unit>0)? (price/unit)*dose : 0; $('#cost').textContent = (price && dose) ? money(cost) : '-';
+  };
+  $('#add').onclick = saveEntry;
+  // Export/Import
+  $('#exportBtn').onclick = exportData;
+  $('#importBtn').onclick = ()=> $('#importFile').click();
+  $('#importFile').onchange = e=>{ const f=e.target.files?.[0]; if(f) importData(f); e.target.value=''; };
+  // Sync
+  $('#connectSync').onclick = ()=> pickSyncFile();
+  $('#saveToSync').onclick = ()=> saveToSync();
+  $('#loadFromSync').onclick = ()=> loadFromSync();
+  // Init
+  renderList(); select();
+})();</script>
+</body>
+</html>
